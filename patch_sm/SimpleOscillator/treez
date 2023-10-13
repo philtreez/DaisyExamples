@@ -1,0 +1,70 @@
+#include "daisy_patch.h"
+
+using namespace daisy;
+
+DaisyPatch patch;
+
+const size_t numChops = 4;  // Anzahl der Audio-Clips ("chops")
+float chops[numChops];      // Array zum Speichern der "chops"
+int currentChop = 0;        // Aktueller "chop"
+bool isRecording = false;   // Aufnahmemodus
+bool isPlaying = false;     // Wiedergabemodus
+float playPosition = 0.0f;  // Wiedergabeposition im aktuellen "chop"
+float pitchCV = 1.0f;       // Tonhöhe (Pitch) CV
+
+void AudioCallback(AudioHandle::InputBuffer in, AudioHandle::OutputBuffer out, size_t size)
+{
+    for (size_t i = 0; i < size; i++)
+    {
+        // Wenn im Aufnahmemodus und "gate_in_1" aktiv ist
+        if (isRecording && patch.gate_input[0].Trig())
+        {
+            // Lesen Sie das Audiosignal vom Eingang "IN_L[i]"
+            float inputSample = in[0][i];
+            
+            // Speichern Sie das Audiosignal im aktuellen "chop"
+            chops[currentChop] = inputSample;
+            
+            // Senden Sie das Audiosignal zum Ausgang "OUT_L[i]" (Bypass)
+            out[0][i] = inputSample;
+        }
+        // Wenn im Wiedergabemodus und "gate_in_2" aktiv ist
+        else if (isPlaying && patch.gate_input[1].Trig())
+        {
+            // Lesen Sie das Audiosignal vom aktuellen "chop" und setzen Sie die Position
+            float inputSample = chops[currentChop] * 0.5f;  // Ändern Sie den Lautstärkepegel nach Bedarf
+            
+            // Ändern Sie die Tonhöhe (Pitch) mithilfe der CV
+            inputSample *= pitchCV;  // Passen Sie die Tonhöhe an
+            
+            // Senden Sie das Audiosignal zum Ausgang "OUT_L[i]"
+            out[0][i] = inputSample;
+            
+            // Aktualisieren Sie die Wiedergabeposition
+            playPosition += 1.0f;
+            
+            // Wenn das Ende des "chop" erreicht ist, stoppen Sie die Wiedergabe
+            if (playPosition >= numChops)
+            {
+                isPlaying = false;
+                playPosition = 0.0f;
+            }
+        }
+        // Im Bypass-Modus
+        else
+        {
+            // Mischen Sie das Audiosignal vom Eingang "IN_L[i]" zum Ausgang "OUT_L[i]" (Bypass)
+            out[0][i] = in[0][i];
+        }
+    }
+}
+
+int main(void)
+{
+    patch.Init();
+
+    while (1)
+    {
+        // Hauptprogrammschleife
+    }
+}
